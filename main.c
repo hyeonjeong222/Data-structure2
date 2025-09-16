@@ -1,95 +1,108 @@
 #include <stdio.h>
-#include <string.h>
 #include <ctype.h>
+#include <string.h>
 
-char input_str[256];
-int pos = 0;
-int total_nodes = 0;
-int leaf_nodes = 0;
+#define ERROR 0
+#define TRUE 1
+#define FALSE 2
 
-int parse_tree();
-
-int parse_tree() {
-    if (pos >= strlen(input_str) || input_str[pos] != '(') {
-        return -1;
-    }
-
-    pos++;
-
-    if (!isalpha(input_str[pos])) {
-        if (input_str[pos] == ')') {
-            pos++;
-            return -1;
+void trim(char* buf) {
+    char* src = buf;
+    char* dst = buf;
+    while (*src != '\0') {
+        if (!isspace((unsigned char)*src)) {
+            *dst++ = *src;
         }
-        return -1;
+        src++;
     }
+    *dst = '\0';
+}
 
-    pos++;
-    total_nodes++;
+int check_paren(char* buf, int size) {
+    int count = 0;
+    for (int i = 0; i < size; i++) {
+        if (buf[i] == '(') count++;
+        else if (buf[i] == ')') {
+            count--;
+            if (count < 0) return 0;
+        }
+    }
+    return (count == 0);
+}
 
-    int max_child_height = -1;
-    int child_count = 0;
+int check_root(char* buf, int size) {
+    if (size < 2) return 0;
+    if (buf[0] != '(' || buf[size - 1] != ')') return 0;
+    return 1;
+}
 
-    while (input_str[pos] != ')') {
-        if (isalpha(input_str[pos])) {
-            total_nodes++;
-            child_count++;
-            pos++;
+int parse_node(const char* s, int* idx, int size, int* not_binary) {
+    if (*idx >= size) return 0;
 
-            if (input_str[pos] == '(') {
-                int child_height = parse_tree();
-                if (child_height > max_child_height) {
-                    max_child_height = child_height;
-                }
+    if (s[*idx] == '(') {
+        (*idx)++;
+        if (*idx >= size) return 0;
+
+        if (!isalpha((unsigned char)s[*idx])) return 0;
+        while (*idx < size && isalpha((unsigned char)s[*idx])) (*idx)++;
+
+        int child_count = 0;
+        while (*idx < size && s[*idx] != ')') {
+            if (s[*idx] == '(') {
+                if (!parse_node(s, idx, size, not_binary)) return 0;
+            }
+            else if (isalpha((unsigned char)s[*idx])) {
+                while (*idx < size && isalpha((unsigned char)s[*idx])) (*idx)++;
             }
             else {
-                if (-1 > max_child_height) {
-                    max_child_height = -1;
-                }
-            }
-        }
-        else if (input_str[pos] == '(') {
-            int child_height = parse_tree();
-            if (child_height > max_child_height) {
-                max_child_height = child_height;
+                return 0;
             }
             child_count++;
+            if (child_count > 2) *not_binary = 1;
         }
-        else {
-            return -1;
-        }
-    }
 
-    if (input_str[pos] != ')') {
-        return -1;
+        if (*idx >= size || s[*idx] != ')') return 0;
+        (*idx)++;
+        return 1;
     }
-    pos++;
+    return 0;
+}
 
-    if (child_count == 0) {
-        leaf_nodes++;
-        return 0;
-    }
+int check_binary_tree(char* buf) {
+    int size = strlen(buf);
+    int idx = 0;
+    int not_binary = 0;
 
-    return max_child_height + 1;
+    if (!parse_node(buf, &idx, size, &not_binary)) return ERROR;
+    if (idx != size) return ERROR;
+
+    return not_binary ? FALSE : TRUE;
 }
 
 int main() {
-    printf("공백이 없는 괄호 형식의 트리를 입력하세요 (예: (A(B(CD)E(GH)))): \n");
-    scanf("%s", input_str);
+    char buf[1000];
+    if (!fgets(buf, sizeof(buf), stdin)) {
+        printf("ERROR");
+        return 0;
+    }
 
-    printf("\nInput: %s\n", input_str);
+    trim(buf);
+    int size = strlen(buf);
 
-    total_nodes = 0;
-    leaf_nodes = 0;
-    pos = 0;
+    if (!check_paren(buf, size) || !check_root(buf, size)) {
+        printf("ERROR");
+        return 0;
+    }
 
-    int root_height = parse_tree();
-
-    if (root_height == -1 || pos != strlen(input_str)) {
-        printf("Output: ERROR\n");
+    int result = check_binary_tree(buf);
+    if (result == ERROR) {
+        printf("ERROR");
+    }
+    else if (result == TRUE) {
+        printf("TRUE");
     }
     else {
-        printf("Output: %d, %d, %d\n", root_height, total_nodes, leaf_nodes);
+        printf("FALSE");
     }
 
     return 0;
