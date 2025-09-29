@@ -3,17 +3,14 @@
 #include <string.h>
 #include <ctype.h>
 
-// 트리 노드와 배열 크기 정의
 #define MAX_NODES 100
 char tree_array[MAX_NODES];
 int node_count = 0;
 int max_index = 0;
 
-// 입력 문자열 파싱을 위한 전역 변수
 char input_str[256];
 int pos = 0;
 
-// 스택 자료구조 정의 (반복적 순회에 사용)
 typedef struct {
     int items[MAX_NODES];
     int top;
@@ -40,7 +37,6 @@ int pop(Stack* s) {
     return -1;
 }
 
-// 괄호 형식의 트리를 배열로 변환하는 함수
 void parse_and_build(int index) {
     if (pos >= strlen(input_str)) {
         return;
@@ -72,7 +68,6 @@ void parse_and_build(int index) {
     }
 }
 
-// 재귀적 순회 함수들
 void pre_order_recursive(int index) {
     if (index > 0 && tree_array[index] != '\0') {
         printf("%c", tree_array[index]);
@@ -97,7 +92,6 @@ void post_order_recursive(int index) {
     }
 }
 
-// 반복적 순회 함수들 (스택 사용)
 void pre_order_iterative(int index) {
     Stack s;
     init_stack(&s);
@@ -163,13 +157,11 @@ int main() {
     printf("괄호 형식의 이진 트리를 입력하세요 (예: (A (B(C)(D)) (E(F)(G))))\n");
     printf("주의: 공백을 포함한 전체 문자열을 입력해도 됩니다.\n");
 
-    // fgets로 공백을 포함한 한 줄 전체를 입력받음
     if (fgets(input_str, sizeof(input_str), stdin) == NULL) {
         printf("Input Error\n");
         return 1;
     }
 
-    // 입력 문자열에서 모든 공백과 줄바꿈 문자 제거
     char clean_input[256];
     int k = 0;
     for (int j = 0; j < strlen(input_str); j++) {
