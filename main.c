@@ -1,216 +1,118 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include <ctype.h>
+#include <time.h>
 
-#define MAX_NODES 100
-char tree_array[MAX_NODES];
-int node_count = 0;
-int max_index = 0;
+#define ARRAY_SIZE 100
+#define RANGE_MAX 1000
 
-char input_str[256];
-int pos = 0;
+typedef struct Node {
+    int key;
+    struct Node* left;
+    struct Node* right;
+} Node;
 
-typedef struct {
-    int items[MAX_NODES];
-    int top;
-} Stack;
-
-void init_stack(Stack* s) {
-    s->top = -1;
-}
-
-int is_empty(Stack* s) {
-    return s->top == -1;
-}
-
-void push(Stack* s, int value) {
-    if (s->top < MAX_NODES - 1) {
-        s->items[++s->top] = value;
+Node* createNode(int key) {
+    Node* newNode = (Node*)malloc(sizeof(Node));
+    if (newNode == NULL) {
+        exit(1);
     }
+    newNode->key = key;
+    newNode->left = NULL;
+    newNode->right = NULL;
+    return newNode;
 }
 
-int pop(Stack* s) {
-    if (!is_empty(s)) {
-        return s->items[s->top--];
+Node* insert(Node* root, int key) {
+    if (root == NULL) {
+        return createNode(key);
+    }
+    if (key < root->key) {
+        root->left = insert(root->left, key);
+    }
+    else if (key > root->key) {
+        root->right = insert(root->right, key);
+    }
+    return root;
+}
+
+int linearSearch(int arr[], int size, int target, int* comparisons) {
+    *comparisons = 0;
+    for (int i = 0; i < size; i++) {
+        (*comparisons)++;
+        if (arr[i] == target) {
+            return i;
+        }
     }
     return -1;
 }
 
-void parse_and_build(int index) {
-    if (pos >= strlen(input_str)) {
-        return;
-    }
-
-    char node_label = input_str[pos];
-
-    if (node_label == '(' || node_label == ')') {
-        return;
-    }
-
-    tree_array[index] = node_label;
-    if (index > max_index) {
-        max_index = index;
-    }
-    node_count++;
-    pos++;
-
-    if (pos < strlen(input_str) && input_str[pos] == '(') {
-        pos++;
-        parse_and_build(index * 2);
-        pos++;
-    }
-
-    if (pos < strlen(input_str) && input_str[pos] == '(') {
-        pos++;
-        parse_and_build(index * 2 + 1);
-        pos++;
-    }
-}
-
-void pre_order_recursive(int index) {
-    if (index > 0 && tree_array[index] != '\0') {
-        printf("%c", tree_array[index]);
-        pre_order_recursive(index * 2);
-        pre_order_recursive(index * 2 + 1);
-    }
-}
-
-void in_order_recursive(int index) {
-    if (index > 0 && tree_array[index] != '\0') {
-        in_order_recursive(index * 2);
-        printf("%c", tree_array[index]);
-        in_order_recursive(index * 2 + 1);
-    }
-}
-
-void post_order_recursive(int index) {
-    if (index > 0 && tree_array[index] != '\0') {
-        post_order_recursive(index * 2);
-        post_order_recursive(index * 2 + 1);
-        printf("%c", tree_array[index]);
-    }
-}
-
-void pre_order_iterative(int index) {
-    Stack s;
-    init_stack(&s);
-    push(&s, index);
-
-    while (!is_empty(&s)) {
-        int current_index = pop(&s);
-        if (current_index > 0 && tree_array[current_index] != '\0') {
-            printf("%c", tree_array[current_index]);
-
-            if (current_index * 2 + 1 < MAX_NODES && tree_array[current_index * 2 + 1] != '\0') {
-                push(&s, current_index * 2 + 1);
-            }
-            if (current_index * 2 < MAX_NODES && tree_array[current_index * 2] != '\0') {
-                push(&s, current_index * 2);
-            }
+Node* bstSearch(Node* root, int target, int* comparisons) {
+    *comparisons = 0;
+    Node* current = root;
+    while (current != NULL) {
+        (*comparisons)++;
+        if (target == current->key) {
+            return current;
+        }
+        else if (target < current->key) {
+            current = current->left;
+        }
+        else {
+            current = current->right;
         }
     }
-}
-
-void in_order_iterative(int index) {
-    Stack s;
-    init_stack(&s);
-    int current_index = index;
-
-    while (current_index > 0 || !is_empty(&s)) {
-        while (current_index > 0 && tree_array[current_index] != '\0') {
-            push(&s, current_index);
-            current_index *= 2;
-        }
-        current_index = pop(&s);
-        if (current_index != -1) {
-            printf("%c", tree_array[current_index]);
-            current_index = current_index * 2 + 1;
-        }
-    }
-}
-
-void post_order_iterative(int index) {
-    Stack s1, s2;
-    init_stack(&s1);
-    init_stack(&s2);
-    push(&s1, index);
-
-    while (!is_empty(&s1)) {
-        int current_index = pop(&s1);
-        push(&s2, current_index);
-
-        if (current_index * 2 < MAX_NODES && tree_array[current_index * 2] != '\0') {
-            push(&s1, current_index * 2);
-        }
-        if (current_index * 2 + 1 < MAX_NODES && tree_array[current_index * 2 + 1] != '\0') {
-            push(&s1, current_index * 2 + 1);
-        }
-    }
-
-    while (!is_empty(&s2)) {
-        printf("%c", tree_array[pop(&s2)]);
-    }
+    return NULL;
 }
 
 int main() {
-    printf("괄호 형식의 이진 트리를 입력하세요 (예: (A (B(C)(D)) (E(F)(G))))\n");
-    printf("주의: 공백을 포함한 전체 문자열을 입력해도 됩니다.\n");
+    int arr[ARRAY_SIZE];
+    Node* bstRoot = NULL;
+    int targetValue;
 
-    if (fgets(input_str, sizeof(input_str), stdin) == NULL) {
-        printf("Input Error\n");
-        return 1;
+    srand(time(NULL));
+    printf("100개의 무작위 숫자 생성: \n");
+    for (int i = 0; i < ARRAY_SIZE; i++) {
+        arr[i] = rand() % (RANGE_MAX + 1);
+        printf("%d ", arr[i]);
+        bstRoot = insert(bstRoot, arr[i]);
     }
+    printf("\n\n");
 
-    char clean_input[256];
-    int k = 0;
-    for (int j = 0; j < strlen(input_str); j++) {
-        if (!isspace(input_str[j])) {
-            clean_input[k++] = input_str[j];
-        }
-    }
-    clean_input[k] = '\0';
-    strcpy(input_str, clean_input);
+    targetValue = arr[49];
+    printf("임의로 선택한 탐색 대상 숫자: %d\n\n", targetValue);
 
-    printf("\nInput: %s\n", input_str);
+    clock_t start_linear = clock();
+    int linearComparisons = 0;
+    int linearResult = linearSearch(arr, ARRAY_SIZE, targetValue, &linearComparisons);
+    clock_t end_linear = clock();
+    double time_linear = (double)(end_linear - start_linear) / CLOCKS_PER_SEC * 1000;
 
-    memset(tree_array, '\0', sizeof(tree_array));
-    pos = 0;
+    clock_t start_bst = clock();
+    int bstComparisons = 0;
+    Node* bstResult = bstSearch(bstRoot, targetValue, &bstComparisons);
+    clock_t end_bst = clock();
+    double time_bst = (double)(end_bst - start_bst) / CLOCKS_PER_SEC * 1000;
 
-    if (input_str[0] == '(' && isalpha(input_str[1])) {
-        pos = 1;
-        parse_and_build(1);
+    printf("--- 선형 탐색 결과 ---\n");
+    if (linearResult != -1) {
+        printf("숫자 %d를 배열에서 찾았습니다.\n", targetValue);
+        printf("탐색 위치: %d\n", linearResult);
     }
     else {
-        printf("Output:\nERROR\n");
-        return 1;
+        printf("숫자 %d를 배열에서 찾지 못했습니다.\n", targetValue);
     }
+    printf("비교 횟수: %d회\n", linearComparisons);
+    printf("소요 시간: %.6fms\n\n", time_linear);
 
-    printf("Output:\n");
-
-    printf("pre-order(recursive): ");
-    pre_order_recursive(1);
-    printf("\n");
-
-    printf("in-order(recursive): ");
-    in_order_recursive(1);
-    printf("\n");
-
-    printf("post-order(recursive): ");
-    post_order_recursive(1);
-    printf("\n");
-
-    printf("pre-order(iterative): ");
-    pre_order_iterative(1);
-    printf("\n");
-
-    printf("in-order(iterative): ");
-    in_order_iterative(1);
-    printf("\n");
-
-    printf("post-order(iterative): ");
-    post_order_iterative(1);
-    printf("\n");
+    printf("--- 이진 탐색 트리 결과 ---\n");
+    if (bstResult != NULL) {
+        printf("숫자 %d를 이진 탐색 트리에서 찾았습니다.\n", targetValue);
+    }
+    else {
+        printf("숫자 %d를 이진 탐색 트리에서 찾지 못했습니다.\n", targetValue);
+    }
+    printf("비교 횟수: %d회\n", bstComparisons);
+    printf("소요 시간: %.6fms\n", time_bst);
 
     return 0;
 }
