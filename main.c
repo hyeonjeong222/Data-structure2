@@ -1,118 +1,309 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <math.h>
+#include <string.h>
 
-#define ARRAY_SIZE 100
-#define RANGE_MAX 1000
+// ========== 상수 정의 ==========
+#define DATA_SIZE 1000      // 데이터 개수
+#define SEARCH_COUNT 1000   // 탐색 횟수
+#define MAX_VALUE 10000     // 데이터 최대 값 (0~10000)
 
+// ========== BST/AVL 노드 구조체 정의 ==========
 typedef struct Node {
     int key;
     struct Node* left;
     struct Node* right;
+    int height;
 } Node;
 
-Node* createNode(int key) {
-    Node* newNode = (Node*)malloc(sizeof(Node));
-    if (newNode == NULL) {
-        exit(1);
-    }
-    newNode->key = key;
-    newNode->left = NULL;
-    newNode->right = NULL;
-    return newNode;
+// ========== 함수 원형 (Prototype) 선언 (E0040, C2059 오류가 발생하면 이 블록의 세미콜론을 확인) ==========
+int height(Node* N);
+int max(int a, int b);
+Node* newNode(int key);
+int getBalance(Node* N);
+Node* rightRotate(Node* y);
+Node* leftRotate(Node* x);
+void freeTree(Node* root); // E0147 오류 해결
+
+void arrayInsert(int arr[], int* size, int key);
+Node* bstInsert(Node* node, int key);
+Node* avlInsert(Node* node, int key);
+
+int arrayLinearSearch(const int arr[], int size, int key, int* steps);
+Node* bstSearch(Node* root, int key, int* steps);
+Node* avlSearch(Node* root, int key, int* steps);
+
+void generateRandomData(int data[]);
+void generateSorted0To999(int data[]);
+void generateSorted999To0(int data[]);
+void generateFormulaData(int data[]);
+void generateSearchKeys(int keys[]);
+void runTest(int data[], const char* dataType);
+
+
+// =================================================================
+// ----------------- BST/AVL 헬퍼 함수 정의 (E0169 오류 해결) -----------------
+// =================================================================
+
+int height(Node* N) {
+    if (N == NULL)
+        return 0;
+    return N->height;
 }
 
-Node* insert(Node* root, int key) {
-    if (root == NULL) {
-        return createNode(key);
-    }
-    if (key < root->key) {
-        root->left = insert(root->left, key);
-    }
-    else if (key > root->key) {
-        root->right = insert(root->right, key);
-    }
-    return root;
+int max(int a, int b) {
+    return (a > b) ? a : b;
 }
 
-int linearSearch(int arr[], int size, int target, int* comparisons) {
-    *comparisons = 0;
+Node* newNode(int key) {
+    Node* node = (Node*)malloc(sizeof(Node));
+    if (node == NULL) {
+        perror("메모리 할당 실패");
+        exit(EXIT_FAILURE);
+    }
+    node->key = key;
+    node->left = NULL;
+    node->right = NULL;
+    node->height = 1;
+    return node;
+}
+
+int getBalance(Node* N) {
+    if (N == NULL)
+        return 0;
+    return height(N->left) - height(N->right);
+}
+
+Node* rightRotate(Node* y) {
+    Node* x = y->left;
+    Node* T2 = x->right;
+    x->right = y;
+    y->left = T2;
+    y->height = max(height(y->left), height(y->right)) + 1;
+    x->height = max(height(x->left), height(x->right)) + 1;
+    return x;
+}
+
+Node* leftRotate(Node* x) {
+    Node* y = x->right;
+    Node* T2 = y->left;
+    y->left = x;
+    x->right = T2;
+    x->height = max(height(x->left), height(x->right)) + 1;
+    y->height = max(height(y->left), height(y->right)) + 1;
+    return y;
+}
+
+void freeTree(Node* root) {
+    if (root != NULL) {
+        freeTree(root->left);
+        freeTree(root->right);
+        free(root);
+    }
+}
+
+
+// =================================================================
+// -------------------- 데이터 삽입 및 탐색 함수 정의 ---------------------
+// =================================================================
+
+void arrayInsert(int arr[], int* size, int key) {
+    if (*size < DATA_SIZE) {
+        arr[*size] = key;
+        (*size)++;
+    }
+}
+
+Node* bstInsert(Node* node, int key) {
+    if (node == NULL)
+        return newNode(key);
+    if (key < node->key)
+        node->left = bstInsert(node->left, key);
+    else if (key > node->key)
+        node->right = bstInsert(node->right, key);
+    return node;
+}
+
+Node* avlInsert(Node* node, int key) {
+    if (node == NULL)
+        return newNode(key);
+
+    if (key < node->key)
+        node->left = avlInsert(node->left, key);
+    else if (key > node->key)
+        node->right = avlInsert(node->right, key);
+    else
+        return node;
+
+    node->height = 1 + max(height(node->left), height(node->right));
+    int balance = getBalance(node);
+
+    // LL Case
+    if (balance > 1 && key < node->left->key)
+        return rightRotate(node);
+    // RR Case
+    if (balance < -1 && key > node->right->key)
+        return leftRotate(node);
+    // LR Case
+    if (balance > 1 && key > node->left->key) {
+        node->left = leftRotate(node->left);
+        return rightRotate(node);
+    }
+    // RL Case
+    if (balance < -1 && key < node->right->key) {
+        node->right = rightRotate(node->right);
+        return leftRotate(node);
+    }
+    return node;
+}
+
+int arrayLinearSearch(const int arr[], int size, int key, int* steps) {
     for (int i = 0; i < size; i++) {
-        (*comparisons)++;
-        if (arr[i] == target) {
-            return i;
+        (*steps)++;
+        if (arr[i] == key) {
+            return 1;
         }
     }
-    return -1;
+    return 0;
 }
 
-Node* bstSearch(Node* root, int target, int* comparisons) {
-    *comparisons = 0;
-    Node* current = root;
-    while (current != NULL) {
-        (*comparisons)++;
-        if (target == current->key) {
-            return current;
-        }
-        else if (target < current->key) {
-            current = current->left;
-        }
-        else {
-            current = current->right;
-        }
+Node* bstSearch(Node* root, int key, int* steps) {
+    if (root == NULL || root->key == key) {
+        if (root != NULL) (*steps)++;
+        return root;
     }
-    return NULL;
+    (*steps)++;
+    if (key < root->key) {
+        return bstSearch(root->left, key, steps);
+    }
+    else {
+        return bstSearch(root->right, key, steps);
+    }
 }
 
-int main() {
-    int arr[ARRAY_SIZE];
+Node* avlSearch(Node* root, int key, int* steps) {
+    return bstSearch(root, key, steps);
+}
+
+
+// =================================================================
+// -------------------- 데이터 생성 함수 정의 ---------------------------
+// =================================================================
+
+void generateRandomData(int data[]) {
+    for (int i = 0; i < DATA_SIZE; i++) {
+        data[i] = rand() % (MAX_VALUE + 1);
+    }
+}
+
+void generateSorted0To999(int data[]) {
+    for (int i = 0; i < DATA_SIZE; i++) {
+        data[i] = i;
+    }
+}
+
+void generateSorted999To0(int data[]) {
+    for (int i = 0; i < DATA_SIZE; i++) {
+        data[i] = DATA_SIZE - 1 - i;
+    }
+}
+
+void generateFormulaData(int data[]) {
+    for (int i = 0; i < DATA_SIZE; i++) {
+        data[i] = i * (i % 2 + 2);
+    }
+}
+
+void generateSearchKeys(int keys[]) {
+    for (int i = 0; i < SEARCH_COUNT; i++) {
+        keys[i] = rand() % (MAX_VALUE + 1);
+    }
+}
+
+
+// =================================================================
+// -------------------- 메인 테스트 실행 로직 정의 ------------------------
+// =================================================================
+
+void runTest(int data[], const char* dataType) {
+    int i;
+    int array[DATA_SIZE];
+    int array_size = 0;
     Node* bstRoot = NULL;
-    int targetValue;
+    Node* avlRoot = NULL;
 
-    srand(time(NULL));
-    printf("100개의 무작위 숫자 생성: \n");
-    for (int i = 0; i < ARRAY_SIZE; i++) {
-        arr[i] = rand() % (RANGE_MAX + 1);
-        printf("%d ", arr[i]);
-        bstRoot = insert(bstRoot, arr[i]);
+    printf("--- 데이터 유형: %s ---\n", dataType);
+
+    // 1. 데이터 삽입
+    for (i = 0; i < DATA_SIZE; i++) {
+        arrayInsert(array, &array_size, data[i]);
+        bstRoot = bstInsert(bstRoot, data[i]);
+        avlRoot = avlInsert(avlRoot, data[i]);
     }
-    printf("\n\n");
 
-    targetValue = arr[49];
-    printf("임의로 선택한 탐색 대상 숫자: %d\n\n", targetValue);
+    // 2. 탐색 키 생성
+    int searchKeys[SEARCH_COUNT];
+    generateSearchKeys(searchKeys);
 
-    clock_t start_linear = clock();
-    int linearComparisons = 0;
-    int linearResult = linearSearch(arr, ARRAY_SIZE, targetValue, &linearComparisons);
-    clock_t end_linear = clock();
-    double time_linear = (double)(end_linear - start_linear) / CLOCKS_PER_SEC * 1000;
+    // 3. 탐색 및 평균 횟수 계산 (E0079, E0018, E0757 오류 해결)
+    double totalArraySteps = 0.0;
+    double totalBSTSteps = 0.0;
+    double totalAVLSteps = 0.0;
+    int steps;
 
-    clock_t start_bst = clock();
-    int bstComparisons = 0;
-    Node* bstResult = bstSearch(bstRoot, targetValue, &bstComparisons);
-    clock_t end_bst = clock();
-    double time_bst = (double)(end_bst - start_bst) / CLOCKS_PER_SEC * 1000;
+    for (i = 0; i < SEARCH_COUNT; i++) {
+        int key = searchKeys[i];
 
-    printf("--- 선형 탐색 결과 ---\n");
-    if (linearResult != -1) {
-        printf("숫자 %d를 배열에서 찾았습니다.\n", targetValue);
-        printf("탐색 위치: %d\n", linearResult);
+        // 배열 선형 탐색
+        steps = 0;
+        arrayLinearSearch(array, array_size, key, &steps);
+        totalArraySteps += steps;
+
+        // BST 탐색
+        steps = 0;
+        bstSearch(bstRoot, key, &steps);
+        totalBSTSteps += steps;
+
+        // AVL 탐색
+        steps = 0;
+        avlSearch(avlRoot, key, &steps);
+        totalAVLSteps += steps;
     }
-    else {
-        printf("숫자 %d를 배열에서 찾지 못했습니다.\n", targetValue);
-    }
-    printf("비교 횟수: %d회\n", linearComparisons);
-    printf("소요 시간: %.6fms\n\n", time_linear);
 
-    printf("--- 이진 탐색 트리 결과 ---\n");
-    if (bstResult != NULL) {
-        printf("숫자 %d를 이진 탐색 트리에서 찾았습니다.\n", targetValue);
-    }
-    else {
-        printf("숫자 %d를 이진 탐색 트리에서 찾지 못했습니다.\n", targetValue);
-    }
-    printf("비교 횟수: %d회\n", bstComparisons);
-    printf("소요 시간: %.6fms\n", time_bst);
+    // 4. 결과 출력
+    printf("Array: 평균 탐색 횟수: %.2f\n", totalArraySteps / SEARCH_COUNT);
+    printf("BST: 평균 탐색 횟수: %.2f\n", totalBSTSteps / SEARCH_COUNT);
+    printf("AVL: 평균 탐색 횟수: %.2f\n", totalAVLSteps / SEARCH_COUNT);
+    printf("\n");
+
+    // 5. 메모리 해제
+    freeTree(bstRoot);
+    freeTree(avlRoot);
+}
+
+// ========== 메인 함수 ==========
+int main() {
+    // C4244 경고 해결 및 난수 초기화
+    srand((unsigned int)time(NULL));
+
+    int data[DATA_SIZE];
+
+    // 1. 랜덤 데이터 테스트
+    generateRandomData(data);
+    runTest(data, "1. 무작위 정수 (0~10000)");
+
+    // 2. 오름차순 데이터 테스트
+    generateSorted0To999(data);
+    runTest(data, "2. 오름차순 정렬 (0~999)");
+
+    // 3. 내림차순 데이터 테스트
+    generateSorted999To0(data);
+    runTest(data, "3. 내림차순 정렬 (999~0)");
+
+    // 4. 공식 기반 데이터 테스트
+    generateFormulaData(data);
+    runTest(data, "4. 공식 기반 (i * (i % 2 + 2))");
 
     return 0;
 }
