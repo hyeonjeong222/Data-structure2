@@ -1,232 +1,175 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
-#include <string.h>
+#include <limits.h>
 
-#define VERTICES 100
-#define SPARSE_EDGES 100
-#define DENSE_EDGES 4000
-#define TEST_COUNT 100
+// ========== 상수 정의 ==========
+#define V 10            // 정점의 개수
+#define E 20            // 간선의 개수
+#define MAX_WEIGHT 10   // 최대 무작위 가중치
+#define INF INT_MAX     // 무한대 값 (INT_MAX 사용)
 
-typedef struct EdgeNode {
-    int dest;
-    struct EdgeNode* next;
-} EdgeNode;
+// ========== 전역 변수 및 함수 원형 ==========
+int graph[V][V]; // 인접 행렬 (가중치 저장)
 
-typedef struct GraphAdjList {
-    EdgeNode* head[VERTICES];
-    int num_edges;
-} GraphAdjList;
+void initGraph();
+void generateRandomGraph();
+void dijkstra(int startNode);
+int minDistance(int dist[], int visited[]);
 
-typedef struct GraphAdjMatrix {
-    int matrix[VERTICES][VERTICES];
-    int num_edges;
-} GraphAdjMatrix;
+// ========== 헬퍼 함수 정의 ==========
 
-void initAdjList(GraphAdjList* graph) {
-    int i;
-    for (i = 0; i < VERTICES; i++) {
-        graph->head[i] = NULL;
-    }
-    graph->num_edges = 0;
-}
-
-void initAdjMatrix(GraphAdjMatrix* graph) {
+// 그래프 초기화 (가중치 0 또는 INF)
+void initGraph() {
     int i, j;
-    for (i = 0; i < VERTICES; i++) {
-        for (j = 0; j < VERTICES; j++) {
-            graph->matrix[i][j] = 0;
-        }
-    }
-    graph->num_edges = 0;
-}
-
-int insertEdgeList(GraphAdjList* graph, int u, int v, long long* comparisons) {
-    EdgeNode* current = graph->head[u];
-    while (current != NULL) {
-        (*comparisons)++;
-        if (current->dest == v) {
-            return 0;
-        }
-        current = current->next;
-    }
-
-    EdgeNode* newNode = (EdgeNode*)malloc(sizeof(EdgeNode));
-    if (newNode == NULL) return -1;
-    newNode->dest = v;
-    newNode->next = graph->head[u];
-    graph->head[u] = newNode;
-    graph->num_edges++;
-
-    return 1;
-}
-
-int deleteEdgeList(GraphAdjList* graph, int u, int v, long long* comparisons) {
-    EdgeNode* current = graph->head[u];
-    EdgeNode* prev = NULL;
-
-    while (current != NULL) {
-        (*comparisons)++;
-        if (current->dest == v) {
-            if (prev == NULL) {
-                graph->head[u] = current->next;
+    for (i = 0; i < V; i++) {
+        for (j = 0; j < V; j++) {
+            if (i == j) {
+                graph[i][j] = 0; // 자기 자신으로의 거리는 0
             }
             else {
-                prev->next = current->next;
+                graph[i][j] = 0; // 초기에는 간선 없음 (0으로 표시)
             }
-            free(current);
-            graph->num_edges--;
-            return 1;
-        }
-        prev = current;
-        current = current->next;
-    }
-    return 0;
-}
-
-int manageEdgeMatrix(GraphAdjMatrix* graph, int u, int v, int action, long long* comparisons) {
-    (*comparisons)++;
-
-    if (action == 1) {
-        if (graph->matrix[u][v] == 0) {
-            graph->matrix[u][v] = 1;
-            graph->num_edges++;
-            return 1;
         }
     }
-    else {
-        if (graph->matrix[u][v] == 1) {
-            graph->matrix[u][v] = 0;
-            graph->num_edges--;
-            return 1;
-        }
-    }
-    return 0;
 }
 
-int isConnectedList(GraphAdjList* graph, int u, int v, long long* comparisons) {
-    EdgeNode* current = graph->head[u];
-    while (current != NULL) {
-        (*comparisons)++;
-        if (current->dest == v) {
-            return 1;
-        }
-        current = current->next;
-    }
-    return 0;
-}
-
-int isConnectedMatrix(GraphAdjMatrix* graph, int u, int v, long long* comparisons) {
-    (*comparisons)++;
-    return graph->matrix[u][v] == 1;
-}
-
-int printNeighborsList(GraphAdjList* graph, int u, long long* comparisons) {
-    EdgeNode* current = graph->head[u];
-    int count = 0;
-    while (current != NULL) {
-        (*comparisons)++;
-        count++;
-        current = current->next;
-    }
-    return count;
-}
-
-int printNeighborsMatrix(GraphAdjMatrix* graph, int u, long long* comparisons) {
-    int v, count = 0;
-    for (v = 0; v < VERTICES; v++) {
-        (*comparisons)++;
-        if (graph->matrix[u][v] == 1) {
-            count++;
-        }
-    }
-    return count;
-}
-
-void generateRandomGraph(int num_edges, GraphAdjList* list, GraphAdjMatrix* matrix) {
-    int u, v;
-    initAdjList(list);
-    initAdjMatrix(matrix);
-
-    while (list->num_edges < num_edges) {
-        u = rand() % VERTICES;
-        v = rand() % VERTICES;
-
-        if (u == v) continue;
-
-        long long temp_comp = 0;
-        insertEdgeList(list, u, v, &temp_comp);
-        manageEdgeMatrix(matrix, u, v, 1, &temp_comp);
-    }
-}
-
-void runTest(int num_edges, const char* density) {
-    GraphAdjList list;
-    GraphAdjMatrix matrix;
-
-    generateRandomGraph(num_edges, &list, &matrix);
-
-    size_t list_mem = sizeof(list) + (list.num_edges * sizeof(EdgeNode));
-    size_t matrix_mem = sizeof(matrix);
-
-    long long list_insert_delete_comp = 0;
-    long long matrix_insert_delete_comp = 0;
+// 무작위 그래프 생성
+void generateRandomGraph() {
     int i;
-    int u_test, v_test;
+    int u, v, weight;
+    int edges_added = 0;
 
-    for (i = 0; i < TEST_COUNT; i++) {
-        u_test = rand() % VERTICES;
-        v_test = rand() % VERTICES;
+    printf("--- 생성된 무작위 간선 (출발 -> 도착 : 가중치) ---\n");
 
-        insertEdgeList(&list, u_test, v_test, &list_insert_delete_comp);
-        deleteEdgeList(&list, u_test, v_test, &list_insert_delete_comp);
+    while (edges_added < E) {
+        // 무작위 정점 및 가중치 선택
+        u = rand() % V;
+        v = rand() % V;
+        weight = (rand() % MAX_WEIGHT) + 1; // 1~10 사이의 가중치
 
-        manageEdgeMatrix(&matrix, u_test, v_test, 1, &matrix_insert_delete_comp);
-        manageEdgeMatrix(&matrix, u_test, v_test, 0, &matrix_insert_delete_comp);
+        // 자기 루프 방지 및 이미 간선이 존재하는지 확인 (더 작은 가중치로 갱신)
+        if (u != v) {
+            if (graph[u][v] == 0 || weight < graph[u][v]) {
+                graph[u][v] = weight;
+                edges_added++;
+                printf("(%d -> %d : %d)", u, v, weight);
+                if (edges_added % 5 == 0) printf("\n"); else printf(" | ");
+            }
+        }
     }
-
-    long long list_check_comp = 0;
-    long long matrix_check_comp = 0;
-
-    for (i = 0; i < TEST_COUNT; i++) {
-        u_test = rand() % VERTICES;
-        v_test = rand() % VERTICES;
-        isConnectedList(&list, u_test, v_test, &list_check_comp);
-        isConnectedMatrix(&matrix, u_test, v_test, &matrix_check_comp);
-    }
-
-    long long list_neighbor_comp = 0;
-    long long matrix_neighbor_comp = 0;
-
-    for (i = 0; i < VERTICES; i++) {
-        printNeighborsList(&list, i, &list_neighbor_comp);
-        printNeighborsMatrix(&matrix, i, &matrix_neighbor_comp);
-    }
-
-    printf("\n======================================================\n");
-    printf("그래프 유형: %s (N=%d, E=%d)\n", density, VERTICES, num_edges);
-    printf("======================================================\n");
-
-    printf("1. 인접 리스트\n");
-    printf("메모리: %zu Bytes\n", list_mem);
-    printf("간선 삽입/삭제 평균 비교: %.2f 번\n", (double)list_insert_delete_comp / (TEST_COUNT * 2));
-    printf("두 정점 연결 확인 평균 비교: %.2f 번\n", (double)list_check_comp / TEST_COUNT);
-    printf("한 노드의 인접 노드 탐색 평균 비교: %.2f 번\n", (double)list_neighbor_comp / VERTICES);
-    printf("------------------------------------------------------\n");
-
-    printf("2. 인접 행렬\n");
-    printf("메모리: %zu Bytes\n", matrix_mem);
-    printf("간선 삽입/삭제 평균 비교: %.2f 번\n", (double)matrix_insert_delete_comp / (TEST_COUNT * 2));
-    printf("두 정점 연결 확인 평균 비교: %.2f 번\n", (double)matrix_check_comp / TEST_COUNT);
-    printf("한 노드의 인접 노드 탐색 평균 비교: %.2f 번\n", (double)matrix_neighbor_comp / VERTICES);
-    printf("======================================================\n");
+    printf("\n------------------------------------------------------\n");
 }
+
+// 방문하지 않은 정점 중 최소 거리를 가진 정점을 찾는 함수
+int minDistance(int dist[], int visited[]) {
+    int min = INF, min_index = -1;
+    int v;
+
+    for (v = 0; v < V; v++) {
+        if (visited[v] == 0 && dist[v] <= min) {
+            min = dist[v];
+            min_index = v;
+        }
+    }
+    return min_index;
+}
+
+// ========== 다익스트라 알고리즘 구현 ==========
+
+void dijkstra(int startNode) {
+    int dist[V];     // 시작 노드로부터의 최단 거리 저장
+    int visited[V];  // 정점 방문 여부
+    int parent[V];   // 최단 경로 상의 이전 노드 저장
+    int i, u, v;
+
+    // 초기화
+    for (i = 0; i < V; i++) {
+        dist[i] = INF;
+        visited[i] = 0;
+        parent[i] = -1; // 경로 추적을 위해 부모 노드 초기화
+    }
+
+    dist[startNode] = 0;
+
+    // V-1번 반복하여 모든 정점을 처리
+    for (i = 0; i < V - 1; i++) {
+        // 1. 현재 최단 거리를 가진 정점 u 선택
+        u = minDistance(dist, visited);
+
+        if (u == -1 || dist[u] == INF) break; // 도달할 수 없는 경우 종료
+
+        visited[u] = 1;
+
+        // 2. 인접 정점 v의 거리 갱신
+        for (v = 0; v < V; v++) {
+            // u에서 v로의 간선이 존재하고 (graph[u][v] > 0),
+            // v가 아직 방문되지 않았으며,
+            // u를 거쳐 v로 가는 경로가 현재까지의 dist[v]보다 짧다면 갱신
+            if (!visited[v] && graph[u][v] > 0 && dist[u] != INF &&
+                dist[u] + graph[u][v] < dist[v]) {
+                dist[v] = dist[u] + graph[u][v];
+                parent[v] = u; // 경로 추적
+            }
+        }
+    }
+
+    // 결과 출력
+    printf("\n[시작 노드 %d로부터의 최단 경로]\n", startNode);
+    printf("------------------------------------------------------\n");
+    printf("| 도착 노드 | 최단 거리 | 경로 |\n");
+    printf("------------------------------------------------------\n");
+    for (i = 0; i < V; i++) {
+        if (i != startNode) {
+            printf("| %-9d | %-9s | ", i, (dist[i] == INF ? "INF" : ""));
+            if (dist[i] != INF) {
+                printf("%-4d", startNode); // 시작 노드 출력
+                int current = i;
+                int path_stack[V], top = 0;
+
+                // 경로 역추적 및 스택에 저장
+                while (parent[current] != startNode && current != -1) {
+                    path_stack[top++] = parent[current];
+                    current = parent[current];
+                }
+
+                // 스택에 저장된 중간 경로 출력
+                while (top > 0) {
+                    printf(" -> %-4d", path_stack[--top]);
+                }
+
+                printf(" -> %-4d", i); // 도착 노드 출력
+                printf(" (%d)", dist[i]); // 최단 거리 출력
+            }
+            else {
+                printf("도달 불가");
+            }
+            printf(" |\n");
+        }
+    }
+    printf("------------------------------------------------------\n");
+}
+
+
+// ========== 메인 함수 ==========
 
 int main() {
+    // 난수 초기화 및 시드 설정
     srand((unsigned int)time(NULL));
 
-    runTest(SPARSE_EDGES, "희소");
-    runTest(DENSE_EDGES, "밀집");
+    // 1. 그래프 초기화 및 생성
+    initGraph();
+    generateRandomGraph();
+
+    // 2. 모든 노드를 시작점으로 다익스트라 실행 (10회)
+    printf("\n======================================================\n");
+    printf("             모든 노드 쌍 간의 최단 경로\n");
+    printf("======================================================\n");
+
+    int start;
+    for (start = 0; start < V; start++) {
+        dijkstra(start);
+    }
 
     return 0;
 }
